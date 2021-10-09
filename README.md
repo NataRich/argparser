@@ -1,3 +1,3 @@
 # Argparser
 
-This is a C argument parser library.
+This is an unfinished C argument parser library.
