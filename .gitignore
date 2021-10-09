@@ -55,7 +55,8 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+# End of https://www.toptal.com/developers/gitignore/api/c
+
 # Vim miscellaneous files
 .*.swp
 
-# End of https://www.toptal.com/developers/gitignore/api/c
