@@ -69,7 +69,7 @@ main(int argc, char *argv[])
 		}
 	};
 
-	argparser_init(arg_options, argc, argv);
+	argparser_init(arg_options);
 
 	printf("All good\n");
 
