@@ -10,8 +10,12 @@ main(int argc, char *argv[])
     struct arg_option arg_options[] = {
 		{ {'h'}, "help", "", 1, { "[option]" }, "Prints help message" },
 		{ 
-			{'a'}, "add", "", 4, { "<money>", "<card>", "<item>", "<remark>" }, 
-			"Adds an expense or income record" 
+			{'e'}, "expense", "", 4, { "<money>", "<card>", "<item>", "<remark>" }, 
+			"Adds an expense record" 
+		},
+		{
+			{'i'}, "income", "", 4, { "<money", "<card>", "<item>", "<remark>" },
+			"Adds an income record"
 		},
 		{ 
 			{'f'}, "fetch", "", 1, { "[yymmdd]" }, 
@@ -33,9 +37,7 @@ main(int argc, char *argv[])
 			{ 0 }, "to", "", 1, { "<datestr>" },
 			"Provides a finish point for range operations (inclusive)" 
 		},
-		{ {'e'}, "expense", "", 0, { 0 }, "Does expense-related operations only" },
-		{ {'i'}, "income", "", 0, { 0 }, "Does income-related operations only" },
-		{ {'w'}, "week", "", 0, { 0 },"Signals the date string in format of yyww" },
+		{ {'w'}, "week", "", 0, { 0 }, "Signals the date string in format of yyww" },
 		{ {'v'}, "verbose", "", 0, { 0 }, "Prints verbose messages" },
 		{ { 0 }, "now", "", 0, { 0 }, "Gets today's date information: year, month, week, date" },
 		O_END()
