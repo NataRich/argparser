@@ -70,13 +70,17 @@ struct arg_option
  */
 struct argparser
 {
-	// some necessary local vars
+	struct arg_option *opts;
+	char *c_shorts;
+	char **s_longs;
+	char **s_keywords;
+	char **o_bools;
 };
 
 /**
  * Initializes the program with the given arg_options
  */
-void argparser_init(struct arg_option const *const arg_options, int argc, char **argv);
+void argparser_init(struct arg_option const *const arg_options);
 
 /**
  * Parses arguments
