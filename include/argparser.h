@@ -32,6 +32,7 @@
 #define MAX_NPARAM 10
 #define NINF -1
 
+#define O_END() { { 0 }, "", "", 0, { 0 }, "" }
 
 /**
  * Argument option parameter type definitions
@@ -42,17 +43,6 @@ enum p_type
 	T_DOUBLE,
 	T_STR
 };
-
-#define P_STR_OPT(A) { T_STR,0,A }
-#define P_STR_REQ(A) { T_STR,1,A }
-#define P_INT_OPT(A) { T_INT,0,A }
-#define P_INT_REQ(A) { T_INT,1,A }
-#define P_DOU_OPT(A) { T_DOUBLE,0,A }
-#define P_DOU_REQ(A) { T_DOUBLE,1,A }
-#define P_END() { 0, 0, "" }
-#define O_FUNC(A,B,C,D,E,F) { A,B,C,D,E,F }
-#define O_BOOL(A,B,C) { A,B,"",0,NULL,C }
-#define O_END() { { 0 }, "", "", 0, NULL, "" }
 
 /**
  * Argument option parameter structure
@@ -73,7 +63,7 @@ struct arg_option
 	char const s_long[MAX_STRLEN];
 	char const s_keyword[MAX_STRLEN];
 	int n_params;
-	struct arg_option_param *params;
+	char const *s_hints[MAX_NPARAM];
 	char const *const s_desc;
 };
 
@@ -116,5 +106,15 @@ void get_in_args_size(int *size);
  * Gets input arguments
  */
 void get_in_args(char **in_args);
+
+/**
+ * Gets help message
+ */
+void get_help(struct arg_option const *const opts, char *help);
+
+/**
+ * Gets help message of a specific option
+ */
+void get_opt_help(struct arg_option const *const opt, char *help);
 
 #endif

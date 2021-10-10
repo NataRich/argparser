@@ -64,49 +64,25 @@ static int
 has_only_alnum(char const *const str)
 {
 	if (!has_text(str))
-	{
 		return 0;
-	}
 
 	int pos = 0;
 	while (str[pos] != '\0')
-	{
-		if (!isalnum(str[pos]))
-		{
+		if (!isalnum(str[pos++]))
 			return 0;
-		}
-		pos++;
-	}
-
+	
 	return 1;
 }
 
 /**
- * Checks if input is the ending param
+ * Gets the size of parameter hints
  */
 static int
-is_end_param(struct arg_option_param const *const p)
-{
-	if (p == NULL)
-	{
-		argparser_error("Error: Param must not be NULL");
-	}
-
-	return p->p_type == 0 && p->b_required == 0 && !has_text(p->s_hint);
-}
-
-/**
- * Gets the size of arg_option_param
- */
-static int
-get_params_size(struct arg_option_param const *const params)
+get_hints_size(char const * const*s_hints)
 {
 	int size = 0;
-	while (!is_end_param(params + size))
-	{
+	while (s_hints[size] != NULL && size < MAX_NPARAM)
 		size++;
-	}
-
 	return size;
 }
 
@@ -198,49 +174,49 @@ validate_option(struct arg_option const *const opt)
 		argparser_error("Error: Option[%d].n_params should not exceed %d", _ind, MAX_NPARAM);
 	}
 
-	if (opt->params == NULL && n_params != 0)
+	if (opt->s_hints[0] == NULL && n_params != 0)
 	{
 		if (n_params == NINF)
 		{
-			argparser_error("Error: Option[%d] expected 1 param only but received NULL", _ind);
+			argparser_error("Error: Option[%d] expected 1 hint only but received none", _ind);
 		}
 		else
 		{
-			argparser_error("Error: Option[%d] expected %d param(s) but received NULL", 
+			argparser_error("Error: Option[%d] expected %d hints but received none", 
 					_ind, n_params);
 		}
 	}
 
-	if (opt->params != NULL)
+	if (opt->s_hints[0] != NULL)
 	{
-		int rn_params = get_params_size(opt->params);
+		int rn_hints = get_hints_size(opt->s_hints);
 
 		if (n_params == 0)
 		{
-			argparser_error("Error: Option[%d] expected NULL param but received %d", 
-					_ind, rn_params);
+			argparser_error("Error: Option[%d] expected 0 hints but received %d", 
+					_ind, rn_hints);
 		}
 
-		if (n_params < 0 && rn_params != 1)
+		if (n_params < 0 && rn_hints != 1)
 		{
-			argparser_error("Error: Option[%d] expected %d param(s) but received %d", 
-					_ind, n_params, rn_params);
+			argparser_error("Error: Option[%d] expected 1 hint but received %d", 
+					_ind, rn_hints);
 		}
 
-		if (n_params > 0 && n_params != rn_params)
+		if (n_params > 0 && n_params != rn_hints)
 		{
-			argparser_error("Error: Option[%d] expected %d param(s) but received %d", 
-					_ind, n_params, rn_params);
+			argparser_error("Error: Option[%d] expected %d hints but received %d", 
+					_ind, n_params, rn_hints);
 		}
 	}
 
 	// Validates param content
 	if (n_params < 0)
 	{
-		if (!has_text(opt->params[0].s_hint))
+		if (!has_text(opt->s_hints[0]))
 		{
 			argparser_error(
-					"Error: Option[%d].params[0].s_hint should contain valid help text",
+					"Error: Option[%d].s_hints[0] should contain valid help text",
 					_ind);
 		}
 	}
@@ -249,7 +225,7 @@ validate_option(struct arg_option const *const opt)
 	{
 		for (int i = 0; i < n_params; i++)
 		{
-			if (!has_text(opt->params[i].s_hint))
+			if (!has_text(opt->s_hints[i]))
 			{
 				argparser_error(
 						"Error: Option[%d].params[%d].s_hint should contain valid help text",
@@ -279,15 +255,11 @@ is_end_opt(struct arg_option const *const opt)
 	}
 
 	for (int i = 0; i < MAX_NFLAGS; i++)
-	{
 		if (opt->c_shorts[i] != '\0')
-		{
 			return 0;
-		}
-	}
 
 	return !has_text(opt->s_long) && !has_text(opt->s_keyword) && opt->n_params == 0
-		&& opt->params == NULL && !has_text(opt->s_desc);
+		&& opt->s_hints[0] == NULL && !has_text(opt->s_desc);
 }
 
 /**
@@ -298,10 +270,7 @@ get_options_size(struct arg_option const *const options)
 {
 	int size = 0;
 	while (!is_end_opt(options + size))
-	{
 		size++;
-	}
-
 	return size;
 }
 
@@ -309,15 +278,11 @@ void
 argparser_init(struct arg_option const *const options)
 {
 	if (options == NULL)
-	{
 		argparser_error("Error: Argument options must not be NULL");
-	}
 
 	int size = get_options_size(options);
 	for (int i = 0; i < size; i++)
-	{
 		validate_option(options + i);
-	}
 
 	for (int i = 0; i < size; i++)
 	{
@@ -329,17 +294,13 @@ argparser_init(struct arg_option const *const options)
 			{
 				char new_short = new->c_shorts[k];
 				if (new_short == '\0')
-				{
 					continue;
-				}
 
 				for (int l = 0; l < MAX_NFLAGS; l++)
 				{
 					char old_short = old->c_shorts[l];
 					if (old_short == '\0')
-					{
 						break;
-					}
 
 					if (new_short == old_short)
 					{
@@ -538,9 +499,7 @@ void
 get_func_options(int *ind_funcs)
 {
 	for (int i = 0; i < n_ind_func; i++)
-	{
 		ind_funcs[i] = ind_func[i];
-	}
 }
 
 void
@@ -553,9 +512,7 @@ void
 get_bool_options(int *ind_bools)
 {
 	for (int i = 0; i < n_ind_bool; i++)
-	{
 		ind_bools[i] = ind_bool[i];
-	}
 }
 
 void
@@ -568,7 +525,99 @@ void
 get_in_args(char **in_args)
 {
 	for (int i = 0; i < n_in_arg; i++)
-	{
 		in_args[i] = in_arg[i];
+}
+
+/**
+ * Formats help message of a specific option
+ */
+static void
+format_help(struct arg_option const *const opt, char *help)
+{
+	char buffer[MAX_BUFFER] = { 0 };
+	strcat(buffer, "    ");
+
+	for (int i = 0; i < MAX_NFLAGS; i++)
+	{
+		char ch = opt->c_shorts[i];
+		if (ch == '\0')
+			break;
+
+		char temp[10];
+		sprintf(temp, "-%c, ", ch);
+		strcat(buffer, temp);
 	}
+
+	if (strcmp(opt->s_long, "") != 0)
+	{
+		char temp[MAX_STRLEN];
+		sprintf(temp, "--%s, ", opt->s_long);
+		strcat(buffer, temp);
+	}
+
+	if (strcmp(opt->s_keyword, "") != 0)
+	{
+		char temp[MAX_STRLEN];
+		sprintf(temp, "%s, ", opt->s_keyword);
+		strcat(buffer, temp);
+	}
+
+	buffer[strlen(buffer) - 2] = '\0';
+
+	if (opt->n_params < 0)
+	{
+		char temp[50];
+		sprintf(temp, "    %s", opt->s_hints[0]);
+		strcat(buffer, temp);
+	}
+	else if (opt->n_params > 0)
+	{
+		strcat(buffer, "    ");
+
+		for (int i = 0; i < opt->n_params; i++)
+		{
+			char temp[50];
+			sprintf(temp, "%s ", opt->s_hints[i]);
+			strcat(buffer, temp);
+		}
+	}
+
+	strcat(buffer, "\n        ");
+	strcat(buffer, opt->s_desc);
+	strcat(buffer, "\n\n");
+
+	strcat(help, buffer);
+}
+
+void 
+get_help(struct arg_option const *const opts, char *help)
+{
+	char f_buffer[MAX_BUFFER] = { 0 };
+	char b_buffer[MAX_BUFFER] = { 0 };
+	
+	strcat(f_buffer, "Functional Options: \n");
+	strcat(b_buffer, "Bool Options: \n");
+
+	int size = get_options_size(opts);
+	for (int i = 0; i < size; i++)
+	{
+		if (opts[i].n_params == 0)
+			format_help(opts + i, b_buffer);
+		else
+			format_help(opts + i, f_buffer);
+	}
+
+	strcat(help, f_buffer);
+	strcat(help, b_buffer);
+}
+
+void 
+get_opt_help(struct arg_option const *const opt, char *help)
+{
+	if (opt->n_params == 0)
+		strcat(help, "Bool Option:\n");
+	else
+		strcat(help, "Functional Option: \n");
+
+	format_help(opt, help);
 }
