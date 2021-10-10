@@ -1,4 +1,4 @@
-# Makefile
+# Makefile (Win 10)
 
 CC := gcc
 CSTD := gnu99
