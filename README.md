@@ -1,3 +1,7 @@
 # Argparser
 
-This is an unfinished C argument parser library.
+This is a usable C argument parser library.
+
+## TODO
+[ ] - Tests
+[ ] - Optimization
