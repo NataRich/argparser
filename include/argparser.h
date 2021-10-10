@@ -32,6 +32,7 @@
 #define MAX_NPARAM 10
 #define NINF -1
 
+
 /**
  * Argument option parameter type definitions
  */
@@ -41,6 +42,17 @@ enum p_type
 	T_DOUBLE,
 	T_STR
 };
+
+#define P_STR_OPT(A) { T_STR,0,A }
+#define P_STR_REQ(A) { T_STR,1,A }
+#define P_INT_OPT(A) { T_INT,0,A }
+#define P_INT_REQ(A) { T_INT,1,A }
+#define P_DOU_OPT(A) { T_DOUBLE,0,A }
+#define P_DOU_REQ(A) { T_DOUBLE,1,A }
+#define P_END() { 0, 0, "" }
+#define O_FUNC(A,B,C,D,E,F) { A,B,C,D,E,F }
+#define O_BOOL(A,B,C) { A,B,"",0,NULL,C }
+#define O_END() { { 0 }, "", "", 0, NULL, "" }
 
 /**
  * Argument option parameter structure
@@ -73,16 +85,36 @@ void argparser_init(struct arg_option const *const options);
 /**
  * Parses arguments
  */
-int parse_arg(struct arg_option const *const options, int argc, char const **const argv);
+int parse_arg(struct arg_option const *const options, int argc, char **argv);
 
 /**
- * Gets boolean flags
+ * Gets the number of function options
  */
-void get_bool_options(struct arg_option *dest);
+void get_func_options_size(int *size);
 
 /**
- * Gets input parameters
+ * Gets function options
  */
-void get_params(char **dest);
+void get_func_options(int *ind_funcs);
+
+/**
+ * Gets the number of bool options
+ */
+void get_bool_options_size(int *size);
+
+/**
+ * Gets boolean options
+ */
+void get_bool_options(int *ind_bools);
+
+/**
+ * Gets the number of input arguments
+ */
+void get_in_args_size(int *size);
+
+/**
+ * Gets input arguments
+ */
+void get_in_args(char **in_args);
 
 #endif

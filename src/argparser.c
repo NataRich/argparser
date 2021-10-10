@@ -32,7 +32,7 @@
 
 #include "argparser.h"
 
-#define MAX_NOPT 100
+#define MAX_BUFFER 1024
 
 /**
  * Prints error message and exits program
@@ -93,6 +93,21 @@ is_end_param(struct arg_option_param const *const p)
 	}
 
 	return p->p_type == 0 && p->b_required == 0 && !has_text(p->s_hint);
+}
+
+/**
+ * Gets the size of arg_option_param
+ */
+static int
+get_params_size(struct arg_option_param const *const params)
+{
+	int size = 0;
+	while (!is_end_param(params + size))
+	{
+		size++;
+	}
+
+	return size;
 }
 
 /**
@@ -198,11 +213,7 @@ validate_option(struct arg_option const *const opt)
 
 	if (opt->params != NULL)
 	{
-		int rn_params = 0;
-		while (!is_end_param(opt->params + rn_params))
-		{
-			rn_params++;
-		}
+		int rn_params = get_params_size(opt->params);
 
 		if (n_params == 0)
 		{
@@ -279,6 +290,21 @@ is_end_opt(struct arg_option const *const opt)
 		&& opt->params == NULL && !has_text(opt->s_desc);
 }
 
+/**
+ * Gets the size of arg_options
+ */
+static int
+get_options_size(struct arg_option const *const options)
+{
+	int size = 0;
+	while (!is_end_opt(options + size))
+	{
+		size++;
+	}
+
+	return size;
+}
+
 void 
 argparser_init(struct arg_option const *const options)
 {
@@ -287,12 +313,7 @@ argparser_init(struct arg_option const *const options)
 		argparser_error("Error: Argument options must not be NULL");
 	}
 
-	int size = 0;
-	while (!is_end_opt(options + size))
-	{
-		size++;
-	}
-
+	int size = get_options_size(options);
 	for (int i = 0; i < size; i++)
 	{
 		validate_option(options + i);
@@ -343,10 +364,211 @@ argparser_init(struct arg_option const *const options)
 	}
 }
 
-int 
-parse_arg(struct arg_option const *const options, int argc, char const **const argv)
+static int ind_func[MAX_BUFFER] = { -1 };
+static int n_ind_func = 0;
+static int ind_bool[MAX_BUFFER] = { -1 };
+static int n_ind_bool = 0;
+static char *in_arg[MAX_BUFFER] = { 0 };
+static int n_in_arg = 0;
+
+/**
+ * Checks if input arg_option is a bool option
+ */
+static int
+is_bool_opt(struct arg_option const *const opt)
 {
-	// analysis
+	if (opt == NULL)
+	{
+		argparser_error("Error: Option must not be null\n\t"
+				"in %s (at %d line) in %s", __func__, __LINE__, __FILE__);
+	}
+
+	return opt->n_params == 0;
+}
+
+/**
+ * Adds to bool option pool
+ */
+static void
+add_bool(int ind)
+{
+	ind_bool[n_ind_bool++] = ind;
+	if (n_ind_bool >= MAX_BUFFER)
+	{
+		argparser_error("Error: Bool buffer overflow\n\t"
+				"in %s (at %d line) in %s", __func__, __LINE__, __FILE__);	
+	}
+}
+
+/**
+ * Adds to func option pool
+ */
+static void
+add_func(int ind)
+{
+	ind_func[n_ind_func++] = ind;
+	if (n_ind_func >= MAX_BUFFER)
+	{
+		argparser_error("Error: Func buffer overflow\n\t"
+				"in %s (at %d line) in %s", __func__, __LINE__, __FILE__);	
+	}
+}
+
+/**
+ * Searches the given string in c_shorts, s_long, and s_keyword for a match
+ */
+static int
+search(struct arg_option const *const opts, int opts_size, char const *const arg)
+{
+	int found = 0;
+
+	if (arg[0] == '-')
+	{
+		if (arg[1] == '-')
+		{
+			for (int i = 0; i < opts_size; i++)
+			{
+				if (strcmp(&arg[2], opts[i].s_long) == 0)
+				{
+					if (is_bool_opt(opts + i))
+						add_bool(i);
+					else
+						add_func(i);
+					
+					found = 1; // set found
+					break;
+				}
+			}
+
+			if (found == 0)
+			{
+				argparser_error("Error: Unknown option %s", arg);
+			}
+		}
+		else
+		{
+			int len = strlen(arg);
+			int pos = 1;
+			
+			while (pos < len)
+			{
+				int flag = 0;
+				for (int i = 0; i < opts_size; i++)
+				{
+					for (int j = 0; j < MAX_NFLAGS; j++)
+					{
+						if (opts[i].c_shorts[j] == '\0')
+							break;
+
+						if (opts[i].c_shorts[j] == arg[pos])
+						{
+							if (is_bool_opt(opts + i))
+								add_bool(i);
+							else
+								add_func(i);
+						
+							pos++;
+							flag = 1;
+							break;
+						}
+					}
+					
+					if (flag)
+						break;
+				}
+
+				if (!flag)
+				{
+					argparser_error("Error: Unknown option -%c", arg[pos]);
+				}
+			}
+
+			found = 1;
+		}
+
+	}
+	else
+	{
+		for (int i = 0; i < opts_size; i++)
+		{
+			if (strcmp(opts[i].s_keyword, arg) == 0)
+			{
+				if (is_bool_opt(opts + i))
+					add_bool(i);
+				else
+					add_func(i);
+				
+				found = 1; // set found
+				break;
+			}
+		}
+	}
+
+	return found;
+}
+
+int 
+parse_arg(struct arg_option const *const options, int argc, char **argv)
+{
+	int opt_size = get_options_size(options);
+	for (int i = 1; i < argc; i++)
+	{
+		if (search(options, opt_size, argv[i]) == 0)
+		{
+			in_arg[n_in_arg++] = argv[i];
+			if (n_in_arg >= MAX_BUFFER)
+			{
+				argparser_error("Error: Argument buffer overflow\n\t"
+						"in %s (at %d line) in %s", __func__, __LINE__, __FILE__);
+			}
+		}
+
+	}
+
 	return 1;
 }
 
+void
+get_func_options_size(int *size)
+{
+	*size = n_ind_func;
+}
+
+void 
+get_func_options(int *ind_funcs)
+{
+	for (int i = 0; i < n_ind_func; i++)
+	{
+		ind_funcs[i] = ind_func[i];
+	}
+}
+
+void
+get_bool_options_size(int *size)
+{
+	*size = n_ind_bool;
+}
+
+void
+get_bool_options(int *ind_bools)
+{
+	for (int i = 0; i < n_ind_bool; i++)
+	{
+		ind_bools[i] = ind_bool[i];
+	}
+}
+
+void
+get_in_args_size(int *size)
+{
+	*size = n_in_arg;
+}
+
+void
+get_in_args(char **in_args)
+{
+	for (int i = 0; i < n_in_arg; i++)
+	{
+		in_args[i] = in_arg[i];
+	}
+}
