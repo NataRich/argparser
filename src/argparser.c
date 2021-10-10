@@ -28,6 +28,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "argparser.h"
 
@@ -35,9 +36,13 @@
  * Prints error message and exits program
  */
 static void
-argparser_error(char *error)
+argparser_error(char const *format, ...)
 {
-	fprintf(stderr, error);
+	va_list args;
+	va_start(args, format);
+	vprintf(format, args);
+	va_end(args);
+
 	exit(1);
 }
 
@@ -48,6 +53,30 @@ static int
 has_text(char const *const str)
 {
 	return str != NULL && strlen(str) != 0;
+}
+
+/**
+ * Validates if input string has only alphabets or numbers
+ */
+static int
+has_only_alnum(char const *const str)
+{
+	if (!has_text(str))
+	{
+		return 0;
+	}
+
+	int pos = 0;
+	while (str[pos] != '\0')
+	{
+		if (!isalnum(str[pos]))
+		{
+			return 0;
+		}
+		pos++;
+	}
+
+	return 1;
 }
 
 /**
@@ -78,8 +107,16 @@ validate_option(struct arg_option const *const opt)
 	{
 		if (opt->c_shorts[i] != '\0')
 		{
-			id_exist = 1;
-			break;
+			if (isalnum(opt->c_shorts[i]))
+			{
+				id_exist = 1;
+				break;
+			}
+			else
+			{
+				argparser_error("Error: Option[%d].c_shorts[%d] must be alnum only",
+						_ind, i);
+			}
 		}
 	}
 
@@ -87,15 +124,19 @@ validate_option(struct arg_option const *const opt)
 	{
 		if (strlen(opt->s_long) <= MAX_STRLEN - 1)
 		{
-			id_exist = 1;
+			if (has_only_alnum(opt->s_long))
+			{
+				id_exist = 1;
+			}
+			else
+			{
+				argparser_error("Error: Option[%d].s_long must be alnum only", _ind);
+			}
 		}
 		else
 		{
-			char error[100];
-			sprintf(error, 
-					"Error: Option[%d].s_long must be shorter than %d chars", 
+			argparser_error("Error: Option[%d].s_long must be shorter than %d chars", 
 					_ind, MAX_STRLEN);
-			argparser_error(error);
 		}
 	}
 
@@ -103,25 +144,25 @@ validate_option(struct arg_option const *const opt)
 	{
 		if (strlen(opt->s_keyword) <= MAX_STRLEN - 1)
 		{
-			id_exist = 1;
+			if (has_only_alnum(opt->s_keyword))
+			{
+				id_exist = 1;
+			}
+			else
+			{
+				argparser_error("Error: Option[%d].s_keyword must be alnum only", _ind);
+			}
 		}
 		else
 		{
-			char error[100];
-			sprintf(error, 
-					"Error: Option[%d].s_keyword must be shorter than %d chars", 
+			argparser_error("Error: Option[%d].s_keyword must be shorter than %d chars", 
 					_ind, MAX_STRLEN);
-			argparser_error(error);
 		}
 	}
 
 	if (!id_exist)
 	{
-		char error[100];
-		sprintf(error,
-				"Error, Option[%d] must have at least one identifier",
-				_ind);
-		argparser_error(error);
+		argparser_error("Error: Option[%d] must have at least one identifier", _ind);
 	}
 
 	// Validates number of params
@@ -130,38 +171,26 @@ validate_option(struct arg_option const *const opt)
 	{
 		if (n_params != NINF)
 		{
-			char error[100];
-			sprintf(error, 
-					"Error: Option[%d].n_params should use %d for variable length (not %d)", 
-					_ind, NINF, n_params);
-			argparser_error(error);
+			argparser_error("Error: Option[%d].n_params is invalid; use %d for variable length", 
+					_ind, NINF);
 		}
 	}
 
 	if (n_params > MAX_NPARAM)
 	{
-		char error[100];
-		sprintf(error, "Error: Option[%d].n_params should not exceed %d", _ind, MAX_NPARAM);
-		argparser_error(error);
+		argparser_error("Error: Option[%d].n_params should not exceed %d", _ind, MAX_NPARAM);
 	}
 
 	if (opt->params == NULL && n_params != 0)
 	{
 		if (n_params == NINF)
 		{
-			char error[100];
-			sprintf(error,
-					"Error: Option[%d] expected 1 param for variable length but received NULL",
-					_ind);
-			argparser_error(error);
+			argparser_error("Error: Option[%d] expected 1 param only but received NULL", _ind);
 		}
 		else
 		{
-			char error[100];
-			sprintf(error, 
-					"Error: Option[%d] expected %d param(s) but received NULL", 
+			argparser_error("Error: Option[%d] expected %d param(s) but received NULL", 
 					_ind, n_params);
-			argparser_error(error);
 		}
 	}
 
@@ -175,29 +204,20 @@ validate_option(struct arg_option const *const opt)
 
 		if (n_params == 0)
 		{
-			char error[100];
-			sprintf(error, 
-					"Error: Option[%d] expected NULL param but received %d", 
+			argparser_error("Error: Option[%d] expected NULL param but received %d", 
 					_ind, rn_params);
-			argparser_error(error);
 		}
 
 		if (n_params < 0 && rn_params != 1)
 		{
-			char error[100];
-			sprintf(error, 
-					"Error: Option[%d] expected %d param(s) but received %d for variable length", 
+			argparser_error("Error: Option[%d] expected %d param(s) but received %d", 
 					_ind, n_params, rn_params);
-			argparser_error(error);
 		}
 
 		if (n_params > 0 && n_params != rn_params)
 		{
-			char error[100];
-			sprintf(error, 
-					"Error: Option[%d] expected %d param(s) but received %d", 
+			argparser_error("Error: Option[%d] expected %d param(s) but received %d", 
 					_ind, n_params, rn_params);
-			argparser_error(error);
 		}
 	}
 
@@ -206,11 +226,9 @@ validate_option(struct arg_option const *const opt)
 	{
 		if (!has_text(opt->params[0].s_hint))
 		{
-			char error[100];
-			sprintf(error,
+			argparser_error(
 					"Error: Option[%d].params[0].s_hint should contain valid help text",
 					_ind);
-			argparser_error(error);
 		}
 	}
 	
@@ -220,11 +238,9 @@ validate_option(struct arg_option const *const opt)
 		{
 			if (!has_text(opt->params[i].s_hint))
 			{
-				char error[100];
-				sprintf(error,
+				argparser_error(
 						"Error: Option[%d].params[%d].s_hint should contain valid help text",
 						_ind, i);
-				argparser_error(error);
 			}
 		}
 	}
@@ -232,11 +248,7 @@ validate_option(struct arg_option const *const opt)
 	// Validates help message
 	if (!has_text(opt->s_desc))
 	{
-		char error[100];
-		sprintf(error,
-				"Error: Option[%d].s_desc should contain valid text",
-				_ind);
-		argparser_error(error);	
+		argparser_error("Error: Option[%d].s_desc should contain valid text", _ind);
 	}
 
 	_ind++;
@@ -265,10 +277,14 @@ is_end_opt(struct arg_option const *const opt)
 		&& opt->params == NULL && !has_text(opt->s_desc);
 }
 
+/**
+ * Stores necessary variables
+ */
+// static struct argparser _vars;
+
 void 
-argparser_init(struct arg_option const *const arg_options, int argc, char **argv)
+argparser_init(struct arg_option const *const arg_options)
 {
-	// validation
 	if (arg_options == NULL)
 	{
 		argparser_error("Error: Argument options must not be NULL");
@@ -285,7 +301,7 @@ argparser_init(struct arg_option const *const arg_options, int argc, char **argv
 		validate_option(arg_options + i);
 	}
 
-	// initialization in the right order
+	// TODO: option initialization	
 }
 
 int 
