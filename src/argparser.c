@@ -32,6 +32,8 @@
 
 #include "argparser.h"
 
+#define MAX_NOPT 100
+
 /**
  * Prints error message and exits program
  */
@@ -277,35 +279,72 @@ is_end_opt(struct arg_option const *const opt)
 		&& opt->params == NULL && !has_text(opt->s_desc);
 }
 
-/**
- * Stores necessary variables
- */
-// static struct argparser _vars;
-
 void 
-argparser_init(struct arg_option const *const arg_options)
+argparser_init(struct arg_option const *const options)
 {
-	if (arg_options == NULL)
+	if (options == NULL)
 	{
 		argparser_error("Error: Argument options must not be NULL");
 	}
 
 	int size = 0;
-	while (!is_end_opt(arg_options + size))
+	while (!is_end_opt(options + size))
 	{
 		size++;
 	}
 
 	for (int i = 0; i < size; i++)
 	{
-		validate_option(arg_options + i);
+		validate_option(options + i);
 	}
 
-	// TODO: option initialization	
+	for (int i = 0; i < size; i++)
+	{
+		struct arg_option const *const new = options + i;
+		for (int j = 0; j < i; j++)
+		{
+			struct arg_option const *const old = options + j;
+			for (int k = 0; k < MAX_NFLAGS; k++)
+			{
+				char new_short = new->c_shorts[k];
+				if (new_short == '\0')
+				{
+					continue;
+				}
+
+				for (int l = 0; l < MAX_NFLAGS; l++)
+				{
+					char old_short = old->c_shorts[l];
+					if (old_short == '\0')
+					{
+						break;
+					}
+
+					if (new_short == old_short)
+					{
+						argparser_error("Error: Option[%d].c_shorts[%d] and [%d].c_shorts[%d]"
+								" had duplicate value '%c'", i, k, j, l, new_short);
+					}
+				}
+			}
+
+			if (strcmp(new->s_long, "") != 0 && strcmp(new->s_long, old->s_long) == 0)
+			{
+				argparser_error("Error: Option[%d] and [%d] had duplicate .s_long \"%s\"", 
+						i, j, new->s_long);
+			}
+
+			if (strcmp(new->s_keyword, "") != 0 && strcmp(new->s_keyword, old->s_keyword) == 0)
+			{
+				argparser_error("Error: Option[%d] and [%d] had duplicate .s_keyword \"%s\"", 
+						i, j, new->s_keyword);
+			}
+		}
+	}
 }
 
 int 
-parse_arg(int argc, char const **const argv)
+parse_arg(struct arg_option const *const options, int argc, char const **const argv)
 {
 	// analysis
 	return 1;

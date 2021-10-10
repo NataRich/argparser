@@ -66,26 +66,14 @@ struct arg_option
 };
 
 /**
- * Argparser structure
+ * Validates the given arg_options
  */
-struct argparser
-{
-	struct arg_option *opts;
-	char *c_shorts;
-	char **s_longs;
-	char **s_keywords;
-	char **o_bools;
-};
-
-/**
- * Initializes the program with the given arg_options
- */
-void argparser_init(struct arg_option const *const arg_options);
+void argparser_init(struct arg_option const *const options);
 
 /**
  * Parses arguments
  */
-int parse_arg(int argc, char const **const argv);
+int parse_arg(struct arg_option const *const options, int argc, char const **const argv);
 
 /**
  * Gets boolean flags
