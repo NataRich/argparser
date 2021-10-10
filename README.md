@@ -3,5 +3,7 @@
 This is a usable C argument parser library.
 
 ## TODO
-- [ ] Tests
-- [ ] Optimization
+- [ ] Simplify rule definition
+- [ ] Support custom argument grouping
+- [ ] Write unit tests
+- [ ] Optimize for better performance
