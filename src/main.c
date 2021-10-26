@@ -8,38 +8,38 @@ int
 main(int argc, char *argv[])
 {
     struct arg_option arg_options[] = {
-		{ {'h'}, "help", "", 1, { "[option]" }, "Prints help message" },
+		{ 'h', "help", "", 1, "[option]", "Prints help message" },
 		{ 
-			{'e'}, "expense", "", 4, { "<money>", "<card>", "<item>", "<remark>" }, 
+			'e', "expense", "", 4, "<money> <card> <item> <remark>" , 
 			"Adds an expense record" 
 		},
 		{
-			{'i'}, "income", "", 4, { "<money", "<card>", "<item>", "<remark>" },
+			'i', "income", "", 4, "<money> <card> <item> <remark>",
 			"Adds an income record"
 		},
 		{ 
-			{'f'}, "fetch", "", 1, { "[yymmdd]" }, 
+			'f', "fetch", "", 1, "[yymmdd]", 
 			"Fetches all records of the specified day or today" 
 		},
 		{ 
-			{'d'}, "delete", "", 1, { "<serialno>" }, 
+			'd', "delete", "", 1, "<serialno>", 
 			"Deletes record of the given serial number" 
 		},
 		{ 
-			{ 0 }, "sort", "", 1, { "<new/old/high/low>" }, 
+			0, "sort", "", 1, "<new/old/high/low>", 
 			"Sorts records in the given order" 
 		},
 		{ 
-			{ 0 }, "from", "", 1, { "<datestr>" },
+			0, "from", "", 1, "<datestr>",
 			"Provides a start point for range operations (inclusive)" 
 		},
 		{ 
-			{ 0 }, "to", "", 1, { "<datestr>" },
+			0, "to", "", 1, "<datestr>",
 			"Provides a finish point for range operations (inclusive)" 
 		},
-		{ {'w'}, "week", "", 0, { 0 }, "Signals the date string in format of yyww" },
-		{ {'v'}, "verbose", "", 0, { 0 }, "Prints verbose messages" },
-		{ { 0 }, "now", "", 0, { 0 }, "Gets today's date information: year, month, week, date" },
+		{ 'w', "week", "", 0, "", "Signals the date string in format of yyww" },
+		{ 'v', "verbose", "", 0, "", "Prints verbose messages" },
+		{ 0, "now", "", 0, "", "Gets today's date information: year, month, week, date" },
 		O_END()
 	};
 
