@@ -54,7 +54,20 @@ argparser_error(char const *format, ...)
 static int
 has_text(char const *const str)
 {
-	return str != NULL && strlen(str) != 0;
+	if (str == NULL || strlen(str) == 0)
+		return 0;
+	
+	int pos = 0;
+	int flag = 0;
+	while (str[pos] != '\0')
+	{
+		if (str[pos] != ' ')
+			flag = 1; // not only whitespaces
+		
+		pos++;
+	}
+
+	return flag != 0;
 }
 
 /**
@@ -75,18 +88,6 @@ has_only_alnum(char const *const str)
 }
 
 /**
- * Gets the size of parameter hints
- */
-static int
-get_hints_size(char const * const*s_hints)
-{
-	int size = 0;
-	while (s_hints[size] != NULL && size < MAX_NPARAM)
-		size++;
-	return size;
-}
-
-/**
  * Validates an arg_option structure
  */
 static void
@@ -96,31 +97,25 @@ validate_option(struct arg_option const *const opt)
 
 	// Validates option identifiers
 	int id_exist = 0;
-	for (int i = 0; i < MAX_NFLAGS; i++)
+	
+	// Checks if ch_short is alphanumeric when it's not 0
+	if (opt->ch_short != '\0')
 	{
-		if (opt->c_shorts[i] != '\0')
+		if (isalnum(opt->ch_short))
+			id_exist = 1;
+		else
 		{
-			if (isalnum(opt->c_shorts[i]))
-			{
-				id_exist = 1;
-				break;
-			}
-			else
-			{
-				argparser_error("Error: Option[%d].c_shorts[%d] must be alnum only",
-						_ind, i);
-			}
+			argparser_error("Error: Option[%d].ch_short must be alnum only", _ind);
 		}
 	}
 
-	if (!id_exist && has_text(opt->s_long))
+	// Checks if s_long is alphanumeric when it's a valid string
+	if (has_text(opt->s_long))
 	{
 		if (strlen(opt->s_long) <= MAX_STRLEN - 1)
 		{
 			if (has_only_alnum(opt->s_long))
-			{
 				id_exist = 1;
-			}
 			else
 			{
 				argparser_error("Error: Option[%d].s_long must be alnum only", _ind);
@@ -133,14 +128,13 @@ validate_option(struct arg_option const *const opt)
 		}
 	}
 
-	if (!id_exist && has_text(opt->s_keyword))
+	// Checks if s_keyword is alphanumeric when it's a valid string
+	if (has_text(opt->s_keyword))
 	{
 		if (strlen(opt->s_keyword) <= MAX_STRLEN - 1)
 		{
 			if (has_only_alnum(opt->s_keyword))
-			{
 				id_exist = 1;
-			}
 			else
 			{
 				argparser_error("Error: Option[%d].s_keyword must be alnum only", _ind);
@@ -153,85 +147,31 @@ validate_option(struct arg_option const *const opt)
 		}
 	}
 
-	if (!id_exist)
+	if (id_exist == 0)
 	{
 		argparser_error("Error: Option[%d] must have at least one identifier", _ind);
 	}
 
-	// Validates number of params
-	int n_params = opt->n_params;
-	if (n_params < 0)
+	// Validates number of arguments
+	int n_args = opt->n_args;
+	if (n_args < 0)
 	{
-		if (n_params != NINF)
+		if (n_args != NINF)
 		{
-			argparser_error("Error: Option[%d].n_params is invalid; use %d for variable length", 
+			argparser_error("Error: Option[%d].n_args is invalid; use %d for variable length", 
 					_ind, NINF);
 		}
 	}
 
-	if (n_params > MAX_NPARAM)
+	if (n_args > MAX_NPARAM)
 	{
-		argparser_error("Error: Option[%d].n_params should not exceed %d", _ind, MAX_NPARAM);
+		argparser_error("Error: Option[%d].n_args should not exceed %d", _ind, MAX_NPARAM);
 	}
 
-	if (opt->s_hints[0] == NULL && n_params != 0)
+	// Validates hint message
+	if (!has_text(opt->s_hint) && n_args != 0)
 	{
-		if (n_params == NINF)
-		{
-			argparser_error("Error: Option[%d] expected 1 hint only but received none", _ind);
-		}
-		else
-		{
-			argparser_error("Error: Option[%d] expected %d hints but received none", 
-					_ind, n_params);
-		}
-	}
-
-	if (opt->s_hints[0] != NULL)
-	{
-		int rn_hints = get_hints_size(opt->s_hints);
-
-		if (n_params == 0)
-		{
-			argparser_error("Error: Option[%d] expected 0 hints but received %d", 
-					_ind, rn_hints);
-		}
-
-		if (n_params < 0 && rn_hints != 1)
-		{
-			argparser_error("Error: Option[%d] expected 1 hint but received %d", 
-					_ind, rn_hints);
-		}
-
-		if (n_params > 0 && n_params != rn_hints)
-		{
-			argparser_error("Error: Option[%d] expected %d hints but received %d", 
-					_ind, n_params, rn_hints);
-		}
-	}
-
-	// Validates param content
-	if (n_params < 0)
-	{
-		if (!has_text(opt->s_hints[0]))
-		{
-			argparser_error(
-					"Error: Option[%d].s_hints[0] should contain valid help text",
-					_ind);
-		}
-	}
-	
-	if (n_params > 0)
-	{
-		for (int i = 0; i < n_params; i++)
-		{
-			if (!has_text(opt->s_hints[i]))
-			{
-				argparser_error(
-						"Error: Option[%d].params[%d].s_hint should contain valid help text",
-						_ind, i);
-			}
-		}
+		argparser_error("Error: Option[%d] expected a valid hint", _ind);
 	}
 
 	// Validates help message
@@ -254,12 +194,8 @@ is_end_opt(struct arg_option const *const opt)
 		argparser_error("Error: Option must not be NULL");
 	}
 
-	for (int i = 0; i < MAX_NFLAGS; i++)
-		if (opt->c_shorts[i] != '\0')
-			return 0;
-
-	return !has_text(opt->s_long) && !has_text(opt->s_keyword) && opt->n_params == 0
-		&& opt->s_hints[0] == NULL && !has_text(opt->s_desc);
+	return opt->ch_short == 0 && !has_text(opt->s_long) && !has_text(opt->s_keyword) 
+		&& opt->n_args == 0	&& !has_text(opt->s_hint) && !has_text(opt->s_desc);
 }
 
 /**
@@ -290,24 +226,13 @@ argparser_init(struct arg_option const *const options)
 		for (int j = 0; j < i; j++)
 		{
 			struct arg_option const *const old = options + j;
-			for (int k = 0; k < MAX_NFLAGS; k++)
+			
+			char new_short = new->ch_short;
+			char old_short = old->ch_short;
+			if (new_short != '\0' && new_short == old_short)
 			{
-				char new_short = new->c_shorts[k];
-				if (new_short == '\0')
-					continue;
-
-				for (int l = 0; l < MAX_NFLAGS; l++)
-				{
-					char old_short = old->c_shorts[l];
-					if (old_short == '\0')
-						break;
-
-					if (new_short == old_short)
-					{
-						argparser_error("Error: Option[%d].c_shorts[%d] and [%d].c_shorts[%d]"
-								" had duplicate value '%c'", i, k, j, l, new_short);
-					}
-				}
+				argparser_error("Error: Option[%d].ch_short and [%d].ch_short"
+						" had duplicate value '%c'", i, j, new_short);
 			}
 
 			if (strcmp(new->s_long, "") != 0 && strcmp(new->s_long, old->s_long) == 0)
@@ -344,7 +269,7 @@ is_bool_opt(struct arg_option const *const opt)
 				"in %s (at %d line) in %s", __func__, __LINE__, __FILE__);
 	}
 
-	return opt->n_params == 0;
+	return opt->n_args == 0;
 }
 
 /**
@@ -416,29 +341,24 @@ search(struct arg_option const *const opts, int opts_size, char const *const arg
 				int flag = 0;
 				for (int i = 0; i < opts_size; i++)
 				{
-					for (int j = 0; j < MAX_NFLAGS; j++)
-					{
-						if (opts[i].c_shorts[j] == '\0')
-							break;
-
-						if (opts[i].c_shorts[j] == arg[pos])
-						{
-							if (is_bool_opt(opts + i))
-								add_bool(i);
-							else
-								add_func(i);
-						
-							pos++;
-							flag = 1;
-							break;
-						}
-					}
 					
-					if (flag)
+					if (opts[i].ch_short == '\0')
+						continue;
+
+					if (opts[i].ch_short == arg[pos])
+					{
+						if (is_bool_opt(opts + i))
+							add_bool(i);
+						else
+							add_func(i);
+					
+						pos++;
+						flag = 1;
 						break;
+					}
 				}
 
-				if (!flag)
+				if (flag == 0)
 				{
 					argparser_error("Error: Unknown option -%c", arg[pos]);
 				}
@@ -537,25 +457,21 @@ format_help(struct arg_option const *const opt, char *help)
 	char buffer[MAX_BUFFER] = { 0 };
 	strcat(buffer, "    ");
 
-	for (int i = 0; i < MAX_NFLAGS; i++)
+	if (opt->ch_short != '\0')
 	{
-		char ch = opt->c_shorts[i];
-		if (ch == '\0')
-			break;
-
 		char temp[10];
-		sprintf(temp, "-%c, ", ch);
+		sprintf(temp, "-%c, ", opt->ch_short);
 		strcat(buffer, temp);
 	}
 
-	if (strcmp(opt->s_long, "") != 0)
+	if (has_text(opt->s_long))
 	{
 		char temp[MAX_STRLEN];
 		sprintf(temp, "--%s, ", opt->s_long);
 		strcat(buffer, temp);
 	}
 
-	if (strcmp(opt->s_keyword, "") != 0)
+	if (has_text(opt->s_keyword))
 	{
 		char temp[MAX_STRLEN];
 		sprintf(temp, "%s, ", opt->s_keyword);
@@ -564,22 +480,11 @@ format_help(struct arg_option const *const opt, char *help)
 
 	buffer[strlen(buffer) - 2] = '\0';
 
-	if (opt->n_params < 0)
+	if (has_text(opt->s_hint))
 	{
 		char temp[50];
-		sprintf(temp, "    %s", opt->s_hints[0]);
+		sprintf(temp, "    %s", opt->s_hint);
 		strcat(buffer, temp);
-	}
-	else if (opt->n_params > 0)
-	{
-		strcat(buffer, "    ");
-
-		for (int i = 0; i < opt->n_params; i++)
-		{
-			char temp[50];
-			sprintf(temp, "%s ", opt->s_hints[i]);
-			strcat(buffer, temp);
-		}
 	}
 
 	strcat(buffer, "\n        ");
@@ -601,7 +506,7 @@ get_help(struct arg_option const *const opts, char *help)
 	int size = get_options_size(opts);
 	for (int i = 0; i < size; i++)
 	{
-		if (opts[i].n_params == 0)
+		if (opts[i].n_args == 0)
 			format_help(opts + i, b_buffer);
 		else
 			format_help(opts + i, f_buffer);
@@ -614,7 +519,7 @@ get_help(struct arg_option const *const opts, char *help)
 void 
 get_opt_help(struct arg_option const *const opt, char *help)
 {
-	if (opt->n_params == 0)
+	if (opt->n_args == 0)
 		strcat(help, "Bool Option:\n");
 	else
 		strcat(help, "Functional Option: \n");

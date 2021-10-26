@@ -32,39 +32,19 @@
 #define MAX_NPARAM 10
 #define NINF -1
 
-#define O_END() { { 0 }, "", "", 0, { 0 }, "" }
-
-/**
- * Argument option parameter type definitions
- */
-enum p_type
-{
-	T_INT = 10,
-	T_DOUBLE,
-	T_STR
-};
-
-/**
- * Argument option parameter structure
- */
-struct arg_option_param
-{
-	enum p_type p_type;
-	unsigned int b_required;
-	char const *s_hint;
-};
+#define O_END() { 0, "", "", 0, "", "" }
 
 /**
  * Argument option structure
  */
 struct arg_option
 {
-	char const c_shorts[MAX_NFLAGS];
+	char const ch_short;
 	char const s_long[MAX_STRLEN];
 	char const s_keyword[MAX_STRLEN];
-	int n_params;
-	char const *s_hints[MAX_NPARAM];
-	char const *const s_desc;
+	int const n_args;
+	char const *s_hint;
+	char const *s_desc;
 };
 
 /**
