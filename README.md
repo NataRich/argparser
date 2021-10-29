@@ -4,6 +4,7 @@ This is a usable C argument parser library.
 
 ## TODO
 - [x] Simplify rule definition
-- [ ] Support custom argument grouping
+- [x] Support custom argument grouping
+- [ ] Allow error message getting
 - [ ] Write unit tests
 - [ ] Optimize for better performance
