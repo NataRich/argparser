@@ -8,69 +8,58 @@ int
 main(int argc, char *argv[])
 {
     struct arg_option arg_options[] = {
-		{ 'h', "help", "", 1, "[option]", "Prints help message" },
 		{ 
-			'e', "expense", "", 4, "<money> <card> <item> <remark>" , 
+			false, 'e', "expense", "", "<money> <card> <item> <remark>", 
 			"Adds an expense record" 
 		},
 		{
-			'i', "income", "", 4, "<money> <card> <item> <remark>",
+			false, 'i', "income", "", "<money> <card> <item> <remark>",
 			"Adds an income record"
 		},
 		{ 
-			'f', "fetch", "", 1, "[yymmdd]", 
+			false, 'f', "fetch", "", "[yymmdd]", 
 			"Fetches all records of the specified day or today" 
 		},
 		{ 
-			'd', "delete", "", 1, "<serialno>", 
+			false, 'd', "delete", "", "<serialno>", 
 			"Deletes record of the given serial number" 
 		},
 		{ 
-			0, "sort", "", 1, "<new/old/high/low>", 
+			false, 0, "sort", "", "<new/old/high/low>", 
 			"Sorts records in the given order" 
 		},
 		{ 
-			0, "from", "", 1, "<datestr>",
+			false, 0, "from", "", "<datestr>",
 			"Provides a start point for range operations (inclusive)" 
 		},
 		{ 
-			0, "to", "", 1, "<datestr>",
+			false, 0, "to", "", "<datestr>",
 			"Provides a finish point for range operations (inclusive)" 
 		},
-		{ 'w', "week", "", 0, "", "Signals the date string in format of yyww" },
-		{ 'v', "verbose", "", 0, "", "Prints verbose messages" },
-		{ 0, "now", "", 0, "", "Gets today's date information: year, month, week, date" },
+		{ true, 'h', "help", "", "", "Prints help message" },
+		{ true, 'w', "week", "", "", "Signals the date string in format of yyww" },
+		{ true, 'v', "verbose", "", "", "Prints verbose messages" },
+		{ true, 0, "now", "", "", "Gets today's date information: year, month, week, date" },
 		O_END()
 	};
 
-	argparser_init(arg_options);
+	argparser_setup(arg_options, "v1.0.0");
 
-	int res = parse_arg(arg_options, argc, argv);
+	argparser_parse(argc, argv);
 
-	if (res)
-	{
-		int b_size, f_size, a_size;
-		get_bool_options_size(&b_size);
-		get_func_options_size(&f_size);
-		get_in_args_size(&a_size);
-		printf("bool: %d func: %d in_args: %d\n", b_size, f_size, a_size);
-		
-		char help[1024] = { 0 };
-		get_help(arg_options, help);
-		printf("\n%s\n", help);
+	int size_bf = 0, size_f = 0, size_p = 0;
+	int *bf = NULL, *f = NULL;
+	char **p = NULL;
 
-		char help1[1024] = { 0 };
-		char help2[1024] = { 0 };
-		get_opt_help(arg_options + 2, help1);
-		get_opt_help(arg_options + 8, help2);
-		printf("\n%s\n\n%s\n", help1, help2);
-		
-		printf("All good\n");
-	}
-	else
-		printf("Parse failure\n");
+	argparser_flags(&size_f, f);
+	argparser_bflags(&size_bf, bf);
+	argparser_params(&size_p, p);
 
-	
+	printf("size_flags: %d, size_bflags: %d, size_params: %d\n", size_f, size_bf, size_p);
+
+	argparser_opt_help("f");
+
+	argparser_clean();
 
 	return 0;
 }
