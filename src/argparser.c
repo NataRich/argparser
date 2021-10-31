@@ -29,40 +29,179 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <windows.h>
 
+#include "fmt_str.h"
 #include "argparser.h"
 
-// Maintains option grouping data
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRALEAN
+#include <Windows.h>
+#elif defined(__linux__)
+#include <sys/ioctl.h>
+#endif
+
+/**
+ * Gets the window/terminal width from Windows and Linux.
+ */
+static void
+get_window_width(int *width)
+{
+#if defined(_WIN32)
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+	*width = (int) csbi.dwSize.X;
+#elif defined(__linux__)
+	struct winsize w;
+	ioctl(fileno(stdout), TIOCGWINSZ, &w);
+	*width = (int) w.ws_col;
+#endif
+}
+
+/**
+ * Group structure
+ * 
+ * This is used to store the options in terms of their group names. Futhermore,
+ * it stores the formatted help messages of all the options that belong to this
+ * group.
+ */
 struct group
 {
+	/**
+	 * Group name
+	 */
 	char const *name;
+
+	/**
+	 * Array of option pointers that have the same group name.
+	 * 
+	 * Note: This is dynamically allocated and handled (freed) by
+	 * 		 `argparser_clean()`.
+	 */
 	struct arg_option const **opts;
+
+	/**
+	 * Array of strings that are formatted usage help message of the 
+	 * corresponding options.
+	 * 
+	 * Example: -f, --force
+	 * 
+	 * Note: This is dynamically allocated and handled (freed) by
+	 * 		 `argparser_clean()`.
+	 */
+	char **flag_help;
+
+	/**
+	 * Array of strings that are formatted description of the corresponding 
+	 * options.
+	 * 
+	 * Example: This flag executes the operation without double confirmation.
+	 * 
+	 * Note: This is dynamically allocated and handled (freed) by
+	 * 		 `argparser_clean()`.
+	 */
+	char **desc_help;
+
+	/**
+	 * Number of option pointers stored in `opts`.
+	 */
 	int size_opts;
 };
 
-// Maintains argparser internal data
+/**
+ * Memory structure
+ * 
+ * This is used to store data needed by argparser.
+ */
 struct memory
 {
+	/**
+	 * A shallow copy of options defined by user.
+	 */
 	struct arg_option const *opts;
+
+	/**
+	 * Number of optiosn defined by user.
+	 */
 	int size_opts;
+
+	/**
+	 * Groups of options categorized by group names.
+	 * 
+	 * Note: This is dynamically allocated and handled (freed) by
+	 * 		 `argparser_clean()`.
+	 */
 	struct group *grps;
+
+	/**
+	 * Number of groups (number of different group names).
+	 */
 	int size_grps;
-	int *flags, *bflags;
+
+	/**
+	 * Indices of options of the non-boolean flags identified from input 
+	 * arguments.
+	 * 
+	 * This stores the indices in the order of input (from left to right).
+	 * 
+	 * Note: 1) This is dynamically allocated and handled (freed) by
+	 * 		 `argparser_clean()`.
+	 * 		 2) Non-boolean flags are those who do accept parameters.
+	 */
+	int *flags;
+
+	/**
+	 * Indices of options of the boolean flags identified from input arguments.
+	 * 
+	 * This stores the indices in the order of input (from left to right).
+	 * 
+	 * Note: 1) This is dynamically allocated and handled (freed) by
+	 * 		 `argparser_clean()`.
+	 * 		 2) Boolean flags are those who do not accept any parameters.
+	 */
+	int *bflags;
+
+	/**
+	 * Parameters (arry of strings) identified from input arguments.
+	 * 
+	 * Note: 1) This is dynamically allocated and handled (freed) by
+	 * 		 `argparser_clean()`.
+	 * 		 2) Parameters are all that are not identified as either type of 
+	 * 			flags from the input.
+	 */
 	char **params;
+
+	/**
+	 * Number of non-boolean flags, boolean flags and parameters.
+	 */
 	int size_flags, size_bflags, size_params;
+
+	/**
+	 * Version string.
+	 */
 	char *version;
+
+	/**
+	 * Max length of `flag_help` string in all of the options.
+	 * 
+	 * This is used as indentations during help message formatting.
+	 */
+	int indent;
 };
 
-// Maintains internal storage of critical data
+// Will be dynamically allocated and handled (freed) by `argparser_clean()`.
 static struct memory *mem = NULL;
 
+static void format_line(char *output, int grp_ind, int o_ind);
 static int in_flags(int index);
 static int in_bflags(int index);
 static void add_to_flags(int index);
 static void add_to_bflags(int index);
 static void add_to_params(char *param);
+static void calc_indent();
 static void group_options(struct arg_option const *os, int const size);
+static char *format_desc_help(struct arg_option const *o);
+static char *format_flag_help(struct arg_option const *o);
 static int has_duplicated_ids(struct arg_option const *os, int const size);
 static int is_valid_option(struct arg_option const *o);
 static int is_end_mark(struct arg_option const *o);
@@ -109,7 +248,8 @@ argparser_setup(struct arg_option const *options, char *version)
 		"identifiers declared", __func__);
 	
 	group_options(options, size_opts);
-	
+	calc_indent();
+
 	mem->opts = options;
 	mem->size_opts = size_opts;
 	mem->version = version;
@@ -265,8 +405,36 @@ argparser_params(int *size, char **arr)
 char *
 argparser_help()
 {
-	// TODO;
-	return NULL;
+	if (NULL == mem)
+		argparser_error("Incorrect argparser setup");
+	
+	if (NULL == mem->grps)
+		argparser_error("Incorrect argparser grouping");
+	
+	char *output = (char *) calloc(mem->size_grps, 1500 * sizeof(char));
+	if (NULL == output)
+		argparser_error("Memory not allocated during formatting");
+	
+	for (int i = 0; i < mem->size_grps; i++)
+	{
+		char temp[256] = { 0 };
+		sprintf(temp, "  %s:\n", mem->grps[i].name);
+		strcat(output, temp);
+
+		for (int j = 0; j < mem->grps[i].size_opts; j++)
+		{
+			format_line(output, i, j);
+		}
+
+		strcat(output, "\n");
+	}
+
+	int size = strlen(output) + 1;
+	output = (char *) realloc(output, size * sizeof(char));
+	if (NULL == output)
+		argparser_error("Memory not reallocated during formatting");
+
+	return output;
 }
 
 char *
@@ -278,38 +446,53 @@ argparser_opt_help(char const *id)
 	if (NULL == mem)
 		argparser_error("Incorrect argparser setup");
 	
-	int ind = -1;
-	int const size_id = strlen(id) + 1;
-	for (int i = 0; i < mem->size_opts; i++)
+	if (NULL == mem->grps)
+		argparser_error("Incorrect argparser grouping");
+	
+	int grp_ind = -1, o_ind = -1;
+	int size_id = strlen(id) + 1;
+	for (int i = 0; i < mem->size_grps; i++)
 	{
-		struct arg_option o = mem->opts[i];
-		if (2 == size_id && id[0] == o.ch_short)
+		bool found = false;
+		for (int j = 0; j < mem->grps[i].size_opts; j++)
 		{
-			ind = i;
-			break;
+			struct arg_option const *o = mem->grps[i].opts[j];
+			if (2 == size_id && id[0] == o->ch_short)
+			{
+				grp_ind = i;
+				o_ind = j;
+				found = true;
+				break;
+			}
+
+			if (0 == strcmp(id, o->s_long) || 0 == strcmp(id, o->s_keyword))
+			{
+				grp_ind = i;
+				o_ind = j;
+				found = true;
+				break;
+			}
 		}
 
-		if (0 == strcmp(id, o.s_long) || 0 == strcmp(id, o.s_keyword))
-		{
-			ind = i;
-			break;
-		}
+		if (found) break;
 	}
-
-	if (-1 == ind) return NULL;
 	
-	// struct arg_option o = mem->opts[ind];
+	if (-1 == grp_ind || -1 == o_ind) 
+		return NULL;
 	
-	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	int ret = GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-	if (0 != ret)
-	{
-		// TODO: formatting
-		printf("Console buffer width: %d\n", csbi.dwSize.X);
-		printf("Console buffer height: %d\n", csbi.dwSize.Y);
-	}
+	char *output = (char *) calloc(1, 1500 * sizeof(char));
+	if (NULL == output)
+		argparser_error("Memory not allocated during formatting");
 
-	return NULL;
+	sprintf(output, "  %s:\n", mem->grps[grp_ind].name);
+	format_line(output, grp_ind, o_ind);
+
+	int size = strlen(output) + 1;
+	output = (char *) realloc(output, size * sizeof(char));
+	if (NULL == output)
+		argparser_error("Memory not reallocated during formatting");
+
+	return output;
 }
 
 char *
@@ -327,7 +510,18 @@ argparser_clean()
 		{
 			for (int i = 0; i < mem->size_grps; i++)
 				if (NULL != mem->grps[i].opts)
+				{
 					free(mem->grps[i].opts);
+
+					for (int j = 0; j < mem->grps[i].size_opts; j++)
+					{
+						free(mem->grps[i].flag_help[j]);
+						free(mem->grps[i].desc_help[j]);
+					}
+
+					free(mem->grps[i].flag_help);
+					free(mem->grps[i].desc_help);
+				}
 			free(mem->grps);
 		}
 
@@ -342,6 +536,25 @@ argparser_clean()
 
 		free(mem);
 	}
+}
+
+/**
+ * Formats one line of the help message.
+ */
+static void
+format_line(char *output, int grp_ind, int o_ind)
+{
+	
+	int width;
+	get_window_width(&width);
+	int bound = width / 2;
+    
+	char lstr[300] = { 0 }, rstr[700] = { 0 };
+	int indent = mem->indent + 4 + 2;
+	indent = bound > indent ? indent : bound;
+	strwrap(lstr, mem->grps[grp_ind].flag_help[o_ind], indent, "    ", "  ");
+	strwrap(rstr, mem->grps[grp_ind].desc_help[o_ind], width - indent, "", "");
+	strjoin(output, lstr, rstr, indent);
 }
 
 /**
@@ -450,6 +663,29 @@ add_to_params(char *param)
 }
 
 /**
+ * Calculates the indentation for help message formatting.
+ */
+static void
+calc_indent()
+{
+	if (NULL == mem)
+		argparser_error("Incorrect argparser setup");
+	
+	if (NULL == mem->grps)
+		argparser_error("Incorrect argparser grouped");
+	
+	int max_len = -1;
+	for (int i = 0; i < mem->size_grps; i++)
+		for (int j = 0; j < mem->grps[i].size_opts; j++)
+		{
+			int len = strlen(mem->grps[i].flag_help[j]);
+			if (len > max_len) max_len = len;
+		}
+	
+	mem->indent = max_len;
+}
+
+/**
  * Groups all the options based on their group names.
  */
 static void
@@ -483,6 +719,18 @@ group_options(struct arg_option const *os, int const size)
 				argparser_error("Memory not allocated during grouping");
 
 			mem->grps[0].opts[0] = os;
+
+			mem->grps[0].flag_help = (char **) malloc(sizeof(char *));
+			if (NULL == mem->grps[0].flag_help)
+				argparser_error("Memory not allocated during grouping");
+
+			mem->grps[0].flag_help[0] = format_flag_help(os);
+
+			mem->grps[0].desc_help = (char **) malloc(sizeof(char *));
+			if (NULL == mem->grps[0].desc_help)
+				argparser_error("Memory not allocated during grouping");
+			
+			mem->grps[0].desc_help[0] = format_desc_help(os);
 		}
 		else
 		{
@@ -493,13 +741,28 @@ group_options(struct arg_option const *os, int const size)
 			if (-1 != ind_grp)
 			{
 				int ind = mem->grps[ind_grp].size_opts++;
-				int s = (ind + 1) * SIZE_A;
+				int s1 = (ind + 1) * SIZE_A;
 				mem->grps[ind_grp].opts = 
-					(struct arg_option const **) realloc(mem->grps[ind_grp].opts, s);
+					(struct arg_option const **) realloc(mem->grps[ind_grp].opts, s1);
 				if (NULL == mem->grps[ind_grp].opts)
 					argparser_error("Memory not reallocated during grouping");
 
 				mem->grps[ind_grp].opts[ind] = os + i;
+
+				int s2 = (ind + 1) * sizeof(char *);
+				mem->grps[ind_grp].flag_help = 
+					(char **) realloc(mem->grps[ind_grp].flag_help, s2);
+				if (NULL == mem->grps[ind_grp].flag_help)
+					argparser_error("Memory not reallocated during grouping");
+				
+				mem->grps[ind_grp].flag_help[ind] = format_flag_help(os + i);
+
+				mem->grps[ind_grp].desc_help = 
+					(char **) realloc(mem->grps[ind_grp].desc_help, s2);
+				if (NULL == mem->grps[ind_grp].desc_help)
+					argparser_error("Memory not reallocated during grouping");
+				
+				mem->grps[ind_grp].desc_help[ind] = format_desc_help(os + i);
 			}
 			else
 			{
@@ -517,11 +780,87 @@ group_options(struct arg_option const *os, int const size)
 					argparser_error("Memory not allocated during grouping");
 
 				mem->grps[ind_grp].opts[0] = os + i;
+
+				mem->grps[ind_grp].flag_help = (char **) malloc(sizeof(char *));
+				if (NULL == mem->grps[ind_grp].flag_help)
+					argparser_error("Memory not allocated during grouping");
+
+				mem->grps[ind_grp].flag_help[0] = format_flag_help(os + i);
+
+				mem->grps[ind_grp].desc_help = (char **) malloc(sizeof(char *));
+				if (NULL == mem->grps[ind_grp].desc_help)
+					argparser_error("Memory not allocated during grouping");
+				
+				mem->grps[ind_grp].desc_help[0] = format_desc_help(os + i);
 			}
 		}
 	}
 
 	called++;
+}
+
+/**
+ * Returns a formatted description message of the given option.
+ */
+static char *
+format_desc_help(struct arg_option const *o)
+{
+	char ln_desc[640] = { 0 };
+	sprintf(ln_desc, "%s", o->s_desc);
+
+	int size = strlen(ln_desc) + 1;
+	char *help = (char *) calloc(size, sizeof(char));
+	if (NULL == help)
+		argparser_error("Memory not allocated during formatting");
+	
+	strncat(help, ln_desc, size);
+	return help;
+}
+
+/**
+ * Returns a formatted flag help message of the given option.
+ */
+static char *
+format_flag_help(struct arg_option const *o)
+{
+	char ln_flg[256] = { 0 };
+	if ('\0' != o->ch_short)
+	{
+		char t[64] = { 0 };
+		sprintf(t, "-%c, ", o->ch_short);
+		strcat(ln_flg, t);
+	}
+
+	if (has_text(o->s_long))
+	{
+		char t[64] = { 0 };
+		sprintf(t, "--%s, ", o->s_long);
+		strcat(ln_flg, t);
+	}
+
+	if (has_text(o->s_keyword))
+	{
+		char t[64] = { 0 };
+		sprintf(t, "%s, ", o->s_keyword);
+		strcat(ln_flg, t);
+	}
+
+	ln_flg[strlen(ln_flg) - 2] = ' '; // Removes comma
+
+	if (!o->b)
+	{
+		char t[64] = { 0 };
+		sprintf(t, "%s", o->s_hint);
+		strcat(ln_flg, t);
+	}
+
+	int size = strlen(ln_flg) + 1;
+	char *help = (char *) calloc(size, sizeof(char));
+	if (NULL == help)
+		argparser_error("Memory not allocated during formatting");
+	
+	strncat(help, ln_flg, size);
+	return help;
 }
 
 /**
@@ -652,10 +991,4 @@ argparser_error(char const *format, ...)
 	va_end(args);
 
 	exit(1);
-}
-
-
-int argparser_debug_size_opts()
-{
-	return NULL == mem ? -1 : mem->size_opts;
 }

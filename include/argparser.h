@@ -128,8 +128,6 @@ void argparser_parse(int argc, char **argv);
  * command-line arguments that are not boolean and its size.
  * 
  * This function returns the indices in order.
- * 
- * Note: The return value is dynamically allocated.
  */
 void argparser_flags(int *size, int *arr);
 
@@ -138,8 +136,6 @@ void argparser_flags(int *size, int *arr);
  * command-line arguments and its size.
  * 
  * This function returns the indices in order.
- * 
- * Note: The return value is dynamically allocated.
  */
 void argparser_bflags(int *size, int *arr);
 
@@ -148,8 +144,6 @@ void argparser_bflags(int *size, int *arr);
  * its size.
  * 
  * This function returns the parameters in order.
- * 
- * Note: The return value is dynamically allocated.
  */
 void argparser_params(int *size, char **arr);
 
@@ -162,21 +156,21 @@ void argparser_params(int *size, char **arr);
  * is A > B > C > D.
  *   {..., "A"}, {..., "B"}, {..., "A"}, {..., "C"}, {..., "B"}, {..., "D"}
  * 
- * Note: The return value is dynamically allocated.
+ * Note: The return value is dynamically allocated. Thus, user is responsible
+ * 		 freeing the pointer.
  */
 char *argparser_help();
 
 /**
  * Returns a formatted help message of the option specified by the identifier.
  * 
- * Note: The return value is dynamically allocated.
+ * Note: The return value is dynamically allocated. Thus, user is responsible
+ * 		 freeing the pointer.
  */
 char *argparser_opt_help(char const *id);
 
 /**
  * Returns the version string.
- * 
- * Note: The return value is dynamically allocated.
  */
 char *argparser_version();
 
