@@ -1,8 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "main.h"
-#include "argparser.h"
 
 int
 main(int argc, char *argv[])
@@ -55,10 +55,14 @@ main(int argc, char *argv[])
 	argparser_bflags(&size_bf, bf);
 	argparser_params(&size_p, p);
 
-	printf("size_flags: %d, size_bflags: %d, size_params: %d\n", size_f, size_bf, size_p);
+	// printf("size_flags: %d, size_bflags: %d, size_params: %d\n", size_f, size_bf, size_p);
 
-	argparser_opt_help("f");
+	char *out = argparser_help();
+	// char *out = argparser_opt_help("e");
 
+	printf("%s\n", out);
+
+	free(out);
 	argparser_clean();
 
 	return 0;
